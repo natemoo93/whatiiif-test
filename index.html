@@ -566,6 +566,21 @@ var PLATFORMS=[
       if(!m) return null;
       return 'https://purl.stanford.edu/'+m[1]+'/iiif/manifest';
     }
+  },
+
+  // Dartmouth Digital Collections. The item page is a client-rendered SPA (the
+  // /archive/object/ URL serves an HTML shell, not data), but the manifest is
+  // available at a parallel /archive/iiif/ path with a -mods.json suffix. Both
+  // the manifest and its image service (xcdas-api, ImageService3) are CORS-open,
+  // so the raw URL is returned for a direct fetch.
+  {
+    name:'Dartmouth Digital Collections',
+    pattern:/collections\.dartmouth\.edu\/archive\/object\/([^\/]+)\/([^\/\?#]+)/,
+    toManifest:function(url){
+      var m=url.match(/collections\.dartmouth\.edu\/archive\/object\/([^\/]+)\/([^\/\?#]+)/);
+      if(!m) return null;
+      return 'https://collections.dartmouth.edu/archive/iiif/'+m[1]+'/'+m[2]+'-mods.json';
+    }
   }
 ];
 
@@ -580,6 +595,7 @@ var PLATFORM_LINKS = {
   'Yale Library': 'https://collections.library.yale.edu/',
   'Stanford (SearchWorks)': 'https://searchworks.stanford.edu/',
   'Princeton University Library': 'https://dpul.princeton.edu/',
+  'Dartmouth Digital Collections': 'https://collections.dartmouth.edu/',
 };
 var EXTRA_INSTITUTIONS = [
   { name: 'CARLI Digital Collections', url: 'https://collections.carli.illinois.edu/' },
