@@ -520,6 +520,39 @@ var PLATFORMS=[
     }
   },
 
+  // Princeton main library catalog (catalog.princeton.edu). Different system
+  // from DPUL above: the manifest is not embedded in the page at all, it's
+  // resolved from the Alma bib ID through Figgy's Blacklight search. Query
+  // figgy's catalog.json for the bib ID, confirm the matching record, then
+  // build the manifest from its UUID and resource type (e.g. "Scanned
+  // Resource" maps to the /concern/scanned_resources/ path).
+  {
+    name:'Princeton University Library',
+    pattern:/catalog\.princeton\.edu\/catalog\/(\d+)/,
+    toManifest:async function(url){
+      var bibM=url.match(/catalog\.princeton\.edu\/catalog\/(\d+)/);
+      if(!bibM) return null;
+      var bib=bibM[1];
+      try{
+        var search='https://figgy.princeton.edu/catalog.json?q='+encodeURIComponent(bib);
+        var r=await fetch('/manifest-proxy?url='+encodeURIComponent(search));
+        if(!r.ok) return null;
+        var data=await r.json();
+        var docs=(data&&data.data)||[];
+        // Prefer the record whose source metadata identifier exactly matches the
+        // bib ID, guarding against a fuzzy keyword-search false positive.
+        var doc=docs.filter(function(d){
+          var ids=(d.attributes&&d.attributes.source_metadata_identifier_ssim)||[];
+          return (Array.isArray(ids)?ids:[ids]).indexOf(bib)>-1;
+        })[0]||docs[0];
+        if(!doc||!doc.id) return null;
+        var subtype=figgyConcernType(doc.type);
+        if(!subtype) return null;
+        return 'https://figgy.princeton.edu/concern/'+subtype+'/'+doc.id+'/manifest';
+      }catch(e){ return null; }
+    }
+  },
+
   // Stanford SearchWorks. Catalog record ID is a Stanford druid (2 letters,
   // 3 digits, 2 letters, 4 digits), the same ID used by purl.stanford.edu.
   // Resolved directly against the PURL rather than reading searchworks.stanford.edu
@@ -620,6 +653,15 @@ function parseSignpostingManifest(linkHeader){
     return urlMatch[1];
   }
   return null;
+}
+
+// Maps a Figgy resource type label to its /concern/ URL segment by
+// snake-casing and pluralizing the final word: "Scanned Resource" becomes
+// "scanned_resources", "Ephemera Folder" becomes "ephemera_folders".
+function figgyConcernType(type){
+  var slug=String(type||'').trim().toLowerCase().replace(/\s+/g,'_');
+  if(!slug) return null;
+  return /s$/.test(slug)?slug:slug+'s';
 }
 
 // Baseline fallback heuristics, tried only when no PLATFORMS pattern matches a
